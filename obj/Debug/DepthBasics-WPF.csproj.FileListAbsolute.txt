@@ -24,3 +24,6 @@ C:\Users\kinectme\Documents\Quinn\DepthBasics-WPF\bin\AnyCPU\Debug\Emgu.CV.UI.xm
 C:\Users\kinectme\Documents\Quinn\DepthBasics-WPF\bin\AnyCPU\Debug\Emgu.CV.WPF.pdb
 C:\Users\kinectme\Documents\Quinn\DepthBasics-WPF\bin\AnyCPU\Debug\Emgu.Util.pdb
 C:\Users\kinectme\Documents\Quinn\DepthBasics-WPF\bin\AnyCPU\Debug\Emgu.Util.xml
+C:\Users\kinectme\Documents\Quinn\DepthBasics-WPF\bin\AnyCPU\Debug\opencv_core2410.dll
+C:\Users\kinectme\Documents\Quinn\DepthBasics-WPF\bin\AnyCPU\Debug\opencv_imgproc2410.dll
+C:\Users\kinectme\Documents\Quinn\DepthBasics-WPF\obj\Debug\DepthBasics-WPF_Content.g.cs

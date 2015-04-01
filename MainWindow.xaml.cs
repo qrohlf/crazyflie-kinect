@@ -47,9 +47,9 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         /// <summary>
         /// Bitmap to display
         /// </summary>
-        private WriteableBitmap depthBitmap = null;
+        private WriteableBitmap depthBitmapRaw = null;
 
-        private WriteableBitmap colorDepthBitmap = null;
+        private WriteableBitmap openCVBitmap = null;
 
         /// <summary>
         /// Intermediate storage for frame data converted to color
@@ -59,7 +59,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         private byte[] colorPixels;
 
         // The image we're using for OpenCV tracking
-        private Image<Bgr, UInt16> depthImage;
+        private Image<Gray, byte> depthImage;
 
         /// <summary>
         /// Current status text to display
@@ -89,12 +89,17 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             this.colorPixels = new byte[this.depthFrameDescription.Width * this.depthFrameDescription.Height * sizeof(int)];
 
             // create the bitmap to display
-            this.depthBitmap = new WriteableBitmap(this.depthFrameDescription.Width, this.depthFrameDescription.Height, 96.0, 96.0, PixelFormats.Gray8, null);
+            this.depthBitmapRaw = new WriteableBitmap(this.depthFrameDescription.Width, this.depthFrameDescription.Height, 96.0, 96.0, PixelFormats.Gray8, null);
 
             // better bitmap
-            this.colorDepthBitmap = new WriteableBitmap(this.depthFrameDescription.Width, this.depthFrameDescription.Height, 96.0, 96.0, PixelFormats.Bgr32, null);
+            this.openCVBitmap = new WriteableBitmap(this.depthFrameDescription.Width, this.depthFrameDescription.Height, 96.0, 96.0, PixelFormats.Gray8, null);
 
-            this.depthImage = new Image<Bgr, UInt16>(this.depthFrameDescription.Width, this.depthFrameDescription.Height);
+            // setup the depth OpenCV image
+            this.depthImage = new Image<Gray, byte>(512, 424, new Gray(20));
+            // And draw some text on it.
+            MCvFont f = new MCvFont(FONT.CV_FONT_HERSHEY_COMPLEX, 1.0, 1.0); //Create the font
+            depthImage.Draw("Hello, world", ref f, new System.Drawing.Point(10, 80), new Gray(255)); //Draw "Hello, world." on the image using the specific font
+
 
             // set IsAvailableChanged event notifier
             this.kinectSensor.IsAvailableChanged += this.Sensor_IsAvailableChanged;
@@ -125,7 +130,19 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         {
             get
             {
-                return this.colorDepthBitmap;
+                return this.depthBitmapRaw;
+            }
+        }
+
+        /// <summary>
+        /// Convert an IImage to a WPF BitmapSource. The result can be used in the Set Property of Image.Source
+        /// </summary>
+        /// <param name="image">The Emgu CV Image</param>
+        /// <returns>The equivalent BitmapSource</returns>
+        public ImageSource OpenCVBitmapSource
+        {
+            get {
+                return this.openCVBitmap;
             }
         }
 
@@ -182,13 +199,13 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         /// <param name="e">event arguments</param>
         private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
         {
-            if (this.depthBitmap != null)
+            if (this.depthBitmapRaw != null)
             {
                 // create a png bitmap encoder which knows how to save a .png file
                 BitmapEncoder encoder = new PngBitmapEncoder();
 
                 // create frame from the writable bitmap and add to encoder
-                encoder.Frames.Add(BitmapFrame.Create(this.depthBitmap));
+                encoder.Frames.Add(BitmapFrame.Create(this.depthBitmapRaw));
 
                 string time = System.DateTime.UtcNow.ToString("hh'-'mm'-'ss", CultureInfo.CurrentUICulture.DateTimeFormat);
 
@@ -233,7 +250,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                     {
                         // verify data and write the color data to the display bitmap
                         if (((this.depthFrameDescription.Width * this.depthFrameDescription.Height) == (depthBuffer.Size / this.depthFrameDescription.BytesPerPixel)) &&
-                            (this.depthFrameDescription.Width == this.depthBitmap.PixelWidth) && (this.depthFrameDescription.Height == this.depthBitmap.PixelHeight))
+                            (this.depthFrameDescription.Width == this.depthBitmapRaw.PixelWidth) && (this.depthFrameDescription.Height == this.depthBitmapRaw.PixelHeight))
                         {
                             // Note: In order to see the full range of depth (including the less reliable far field depth)
                             // we are setting maxDepth to the extreme potential depth threshold
@@ -317,28 +334,51 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                 ++colorPixelIndex;
             }
 
-            // We now have a byte[] in depthPixels representing the depth information as a greyscale image. Let's convert that to a format that OpenCV likes
-            //Image<Gray, byte> depthImage = new Image<Gray, Byte>([, this.depthBitmap.PixelWidth, depthPixels]);
+            // We now have a byte[] in depthPixels representing the depth information as a greyscale image. Let's chuck that into the depthImage that OpenCV will 
+            // want to work with
+            depthImage.Bytes = depthPixels;
 
             // And draw some text on it.
             //MCvFont f = new MCvFont(FONT.CV_FONT_HERSHEY_COMPLEX, 1.0, 1.0); //Create the font
-            //depthImage.Draw("Hello, world", ref f, new System.Drawing.Point(10, 80), new Gray(20)); //Draw "Hello, world." on the image using the specific font
+            //depthImage.Draw("Wazzup", ref f, new System.Drawing.Point(10, 180), new Gray(255)); //Draw "Hello, world." on the image using the specific font
+
+            // And do contour stuff to it.
+            using (MemStorage stor = new MemStorage())
+            {
+
+                Contour<System.Drawing.Point> contours = depthImage.FindContours(
+                Emgu.CV.CvEnum.CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE,
+                Emgu.CV.CvEnum.RETR_TYPE.CV_RETR_EXTERNAL,
+                stor);
+
+                for (int i = 0; contours != null; contours = contours.HNext)
+                {
+                    i++;
+
+                    if ((contours.Area > 100) && (contours.Area < 99999))
+                    {
+                        MCvBox2D box = contours.GetMinAreaRect();
+                        depthImage.Draw(box, new Gray(255), 2);
+                    }
+                }
+            } 
+
         }
         /// <summary>
         /// Renders color pixels into the writeableBitmap.
         /// </summary>
         private void RenderDepthPixels()
         {
-            this.depthBitmap.WritePixels(
-                new Int32Rect(0, 0, this.depthBitmap.PixelWidth, this.depthBitmap.PixelHeight),
+            this.depthBitmapRaw.WritePixels(
+                new Int32Rect(0, 0, this.depthBitmapRaw.PixelWidth, this.depthBitmapRaw.PixelHeight),
                 this.depthPixels,
-                this.depthBitmap.PixelWidth,
+                this.depthBitmapRaw.PixelWidth,
                 0);
 
-            this.colorDepthBitmap.WritePixels(
-                new Int32Rect(0, 0, this.colorDepthBitmap.PixelWidth, this.colorDepthBitmap.PixelHeight),
-                this.colorPixels,
-                this.colorDepthBitmap.PixelWidth * sizeof(int),
+            this.openCVBitmap.WritePixels(
+                new Int32Rect(0, 0, this.openCVBitmap.PixelWidth, this.openCVBitmap.PixelHeight),
+                this.depthImage.Bytes,
+                this.openCVBitmap.PixelWidth,
                 0);
         }
 
