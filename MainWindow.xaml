@@ -66,35 +66,32 @@
 
                     <TextBlock Text="Max Distance" Padding="10"/>
                     <StackPanel Orientation="Horizontal">
-                        <Slider Width="250" Minimum="900" Value="900" Maximum="6000" Margin="5" x:Name="sliderMax" Padding="10"/>
+                        <Slider Width="250" Minimum="{Binding Value, ElementName=sliderMin}" Value="900" Maximum="6000" Margin="5" x:Name="sliderMax" Padding="10"/>
                         <TextBlock Text="{Binding Value, ElementName=sliderMax}" VerticalAlignment="Center" />
                     </StackPanel>
 
                     <TextBlock Text="Min Blob Size" Padding="10"/>
                     <StackPanel Orientation="Horizontal">
-                        <Slider Width="250" Minimum="1" Value="10" Maximum="50" Margin="5" x:Name="sliderMinSize"  TickFrequency="1" IsSnapToTickEnabled="True" Interval="1" Padding="10"/>
+                        <Slider Width="250" Minimum="0" Value="50" Maximum="2000" Margin="5" x:Name="sliderMinSize"  TickFrequency="20" IsSnapToTickEnabled="True" Interval="1" Padding="10"/>
                         <TextBlock Text="{Binding Value, ElementName=sliderMinSize}" VerticalAlignment="Center" />
                     </StackPanel>
 
                     <TextBlock Text="Max Blob Size" Padding="10"/>
                     <StackPanel Orientation="Horizontal">
-                        <Slider Width="250" Minimum="1" Value="110" Maximum="500" Margin="5" x:Name="sliderMaxSize"  TickFrequency="1" IsSnapToTickEnabled="True" Interval="1" Padding="10"/>
+                        <Slider Width="250" Minimum="1000" Value="10000" Maximum="90000" Margin="5" x:Name="sliderMaxSize"  TickFrequency="1000" IsSnapToTickEnabled="True" Interval="1" Padding="10"/>
                         <TextBlock Text="{Binding Value, ElementName=sliderMaxSize}" VerticalAlignment="Center" />
                     </StackPanel>
 
                     <TextBlock Background="#ccc" Text="Info" Margin="0,20,0,0" Padding="10"/>
-                    <StackPanel Orientation="Horizontal" Margin="0 10 0 0">
+                    <StackPanel Orientation="Vertical" Margin="0 10 0 0">
                         <TextBlock Text="Blobs Detected" Margin="10 0 0 0" />
-                        <TextBlock TextWrapping="Wrap" x:Name="txtBlobCount" Text="0" Margin="10 0 0 0" />
+                        <TextBlock Height="300" TextWrapping="Wrap" x:Name="txtBlobCount" Text="0" Margin="10 0 0 0" />
                     </StackPanel>
                     <TextBlock TextWrapping="Wrap" x:Name="txtInfo" Text="" Padding="10"/>
 
                 </StackPanel>
             </Grid>
         </Viewbox>
-
-        <Button Grid.Row="2" Style="{StaticResource ScreenshotButton}" Content="Screenshot" Height="Auto" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10 10 0 10" Click="ScreenshotButton_Click" />
-    
     <StatusBar Grid.Row="3" HorizontalAlignment="Stretch" Name="statusBar" VerticalAlignment="Bottom" Background="White" Foreground="{StaticResource MediumGreyBrush}">
       <StatusBarItem Content="{Binding StatusText}" />
     </StatusBar>

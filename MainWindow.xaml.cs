@@ -18,6 +18,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
     using Emgu.CV;
     using Emgu.CV.Structure;
     using Emgu.CV.CvEnum;
+    using System.Text;
 
     /// <summary>
     /// Interaction logic for MainWindow
@@ -56,6 +57,8 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         /// </summary>
         private byte[] depthPixels = null;
 
+        private byte[] monochromePixels = null;
+
         private byte[] colorPixels;
 
         // The image we're using for OpenCV tracking
@@ -85,6 +88,8 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
             // allocate space to put the pixels being received and converted
             this.depthPixels = new byte[this.depthFrameDescription.Width * this.depthFrameDescription.Height];
+
+            this.monochromePixels = new byte[this.depthFrameDescription.Width * this.depthFrameDescription.Height];
 
             this.colorPixels = new byte[this.depthFrameDescription.Width * this.depthFrameDescription.Height * sizeof(int)];
 
@@ -254,12 +259,18 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                         {
                             // Note: In order to see the full range of depth (including the less reliable far field depth)
                             // we are setting maxDepth to the extreme potential depth threshold
-                            ushort maxDepth = ushort.MaxValue;
+                            ushort maxDepth = (ushort)sliderMax.Value;
+
+                            ushort minDepth = (ushort)sliderMin.Value;
+
+                            double minBlob = (ushort)sliderMinSize.Value;
+
+                            double maxBlob = (ushort)sliderMaxSize.Value;
 
                             // If you wish to filter by reliable depth distance, uncomment the following line:
                             //// maxDepth = depthFrame.DepthMaxReliableDistance
                             
-                            this.ProcessDepthFrameData(depthBuffer.UnderlyingBuffer, depthBuffer.Size, depthFrame.DepthMinReliableDistance, maxDepth);
+                            this.ProcessDepthFrameData(depthBuffer.UnderlyingBuffer, depthBuffer.Size, minDepth, maxDepth, minBlob, maxBlob);
                            
                             depthFrameProcessed = true;
                         }
@@ -283,7 +294,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         /// <param name="depthFrameDataSize">Size of the DepthFrame image data</param>
         /// <param name="minDepth">The minimum reliable depth value for the frame</param>
         /// <param name="maxDepth">The maximum reliable depth value for the frame</param>
-        private unsafe void ProcessDepthFrameData(IntPtr depthFrameData, uint depthFrameDataSize, ushort minDepth, ushort maxDepth)
+        private unsafe void ProcessDepthFrameData(IntPtr depthFrameData, uint depthFrameDataSize, ushort minDepth, ushort maxDepth, double minBlob, double maxBlob)
         {
             // depth frame data is a 16 bit value
             ushort* frameData = (ushort*)depthFrameData;
@@ -294,55 +305,22 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                 // Get the depth for this pixel
                 ushort depth = frameData[i];
 
-                // To convert to a byte, we're mapping the depth value to the byte range.
-                // Values outside the reliable depth range are mapped to 0 (black).
-                this.depthPixels[i] = (byte)(depth >= minDepth && depth <= maxDepth ? (depth / MapDepthToByte) : 0);
-            }
-
-
-            // I added this. It may be necessary if we want our OpenCV drawing methods to be able to draw in color.
-            //do the same for the color data
-            // Convert the depth to RGB
-            int colorPixelIndex = 0;
-            for (int i = 0; i < this.depthPixels.Length; ++i)
-            {
-                // Get the depth for this pixel
-                ushort depth = frameData[i];
-
-                // To convert to a byte, we're discarding the most-significant
-                // rather than least-significant bits.
-                // We're preserving detail, although the intensity will "wrap."
+                // Values inside the depth range are mapped to 255 (white).
                 // Values outside the reliable depth range are mapped to 0 (black).
 
-                // Note: Using conditionals in this loop could degrade performance.
-                // Consider using a lookup table instead when writing production code.
-                // See the KinectDepthViewer class used by the KinectExplorer sample
-                // for a lookup table example.
-                byte intensity = (byte)(depth >= minDepth && depth <= maxDepth ? (depth / MapDepthToByte) : 0);
-
-                // Write out blue byte
-                this.colorPixels[colorPixelIndex++] = intensity;
-
-                // Write out green byte
-                this.colorPixels[colorPixelIndex++] = intensity;
-
-                // Write out red byte                        
-                this.colorPixels[colorPixelIndex++] = intensity;
-
-                // We're outputting BGR, the last byte in the 32 bits is unused so skip it
-                // If we were outputting BGRA, we would write alpha here.
-                ++colorPixelIndex;
+                // You are having problems here because you should not be using the slider values in unsafe code?
+                this.depthPixels[i] = (byte)(depth / MapDepthToByte);
+                this.monochromePixels[i] = (byte)(depth >= (int)minDepth && depth <= (int)maxDepth ? 255 : 0);
             }
 
-            // We now have a byte[] in depthPixels representing the depth information as a greyscale image. Let's chuck that into the depthImage that OpenCV will 
-            // want to work with
-            depthImage.Bytes = depthPixels;
-
-            // And draw some text on it.
-            //MCvFont f = new MCvFont(FONT.CV_FONT_HERSHEY_COMPLEX, 1.0, 1.0); //Create the font
-            //depthImage.Draw("Wazzup", ref f, new System.Drawing.Point(10, 180), new Gray(255)); //Draw "Hello, world." on the image using the specific font
+            this.depthImage.Bytes = monochromePixels;
 
             // And do contour stuff to it.
+
+            // note: object creation here is probably a bad idea
+            StringBuilder blobInfo = new StringBuilder();
+            int blobCount = 0;
+
             using (MemStorage stor = new MemStorage())
             {
 
@@ -355,13 +333,25 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                 {
                     i++;
 
-                    if ((contours.Area > 100) && (contours.Area < 99999))
+                    if ((contours.Area > minBlob) && (contours.Area < maxBlob))
                     {
                         MCvBox2D box = contours.GetMinAreaRect();
+                        MCvMoments p = contours.GetMoments();
+                        int x = (int)(p.m10 / p.m00);
+                        int y = (int)(p.m01 / p.m00);
+                        System.Drawing.PointF center = new System.Drawing.PointF(x, y);
+                        CircleF circle = new CircleF(center, 2);
                         depthImage.Draw(box, new Gray(255), 2);
+                        depthImage.Draw(circle, new Gray(127), 0);
+                        blobInfo.Append("Blob ").Append(blobCount).Append(": \n");
+                        blobInfo.Append("Area: ").Append((int)contours.Area).Append("\n");
+                        blobInfo.Append("Center: ").Append(x).Append(", ").Append(y).Append("\n");
+                        blobInfo.Append("\n");
+                        blobCount++;
                     }
                 }
-            } 
+            }
+            txtBlobCount.Text = blobInfo.ToString();
 
         }
         /// <summary>
