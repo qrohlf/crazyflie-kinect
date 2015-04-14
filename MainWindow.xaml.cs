@@ -19,6 +19,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
     using Emgu.CV.Structure;
     using Emgu.CV.CvEnum;
     using System.Text;
+    using ZeroMQ;
 
     /// <summary>
     /// Interaction logic for MainWindow
@@ -68,6 +69,8 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         /// Current status text to display
         /// </summary>
         private string statusText = null;
+
+        private int thrust = 40000;
 
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
@@ -194,6 +197,27 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             {
                 this.kinectSensor.Close();
                 this.kinectSensor = null;
+            }
+        }
+
+        private void sendThrust(int thrust)
+        {
+            using (var context = new ZContext())
+            using (var requester = new ZSocket(context, ZSocketType.PUSH))
+            {
+                // Connect
+                requester.Connect("tcp://127.0.0.1:1212");
+
+                string req = @"{""ctrl"": {
+                        ""version"": 1,
+                        ""roll"": 0.0,
+                        ""pitch"": 0.0,
+                        ""yaw"": 0.0,
+                        ""thrust"": "+thrust+"}}" + "\n";
+                Console.Write("Sending {0}...", req);
+
+                // Send
+                requester.Send(new ZFrame(req));
             }
         }
 
@@ -329,6 +353,8 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                 Emgu.CV.CvEnum.RETR_TYPE.CV_RETR_EXTERNAL,
                 stor);
 
+                int blob0_y = 0;
+
                 for (int i = 0; contours != null; contours = contours.HNext)
                 {
                     i++;
@@ -347,10 +373,37 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                         blobInfo.Append("Area: ").Append((int)contours.Area).Append("\n");
                         blobInfo.Append("Center: ").Append(x).Append(", ").Append(y).Append("\n");
                         blobInfo.Append("\n");
+
+                        if (blobCount == 0)
+                        {
+                            blob0_y = y;
+                        }
                         blobCount++;
                     }
                 }
+
+                if (blobCount == 1)
+                {
+                    int err = 200 - blob0_y; //we want to hover at y=300;
+                    thrust = thrust - err; //adjust thrust accordingly;
+                    if (thrust < 0)
+                    {
+                        thrust = 0;
+                    }
+                    if (thrust > 60000)
+                    {
+                        thrust = 60000;
+                    }
+                    sendThrust(thrust);
+                }
+                else
+                {
+                    sendThrust(20000);
+                }
+                blobInfo.Append("\n THRUST ").Append(thrust).Append("\n");
             }
+
+            
             txtBlobCount.Text = blobInfo.ToString();
 
         }
