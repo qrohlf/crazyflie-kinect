@@ -70,7 +70,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         /// </summary>
         private string statusText = null;
 
-        private int thrust = 40000;
+        private double thrust = 0.5;
 
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
@@ -200,7 +200,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             }
         }
 
-        private void sendThrust(int thrust)
+        private void sendThrust(double thrust)
         {
             using (var context = new ZContext())
             using (var requester = new ZSocket(context, ZSocketType.PUSH))
@@ -384,21 +384,23 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
                 if (blobCount == 1)
                 {
-                    int err = 200 - blob0_y; //we want to hover at y=300;
-                    thrust = thrust - err; //adjust thrust accordingly;
+                    double err = 200 - blob0_y; //we want to hover at y=300;
+                    thrust = thrust - err*0.001; //adjust thrust accordingly;
                     if (thrust < 0)
                     {
                         thrust = 0;
                     }
-                    if (thrust > 60000)
+                    if (thrust > 0.9)
                     {
-                        thrust = 60000;
+                        thrust = 0.9;
                     }
                     sendThrust(thrust);
                 }
+               
                 else
                 {
-                    sendThrust(20000);
+                    sendThrust(0.7);
+                    blobInfo.Append("\n NO LOCK ").Append("0.5").Append("\n");
                 }
                 blobInfo.Append("\n THRUST ").Append(thrust).Append("\n");
             }
