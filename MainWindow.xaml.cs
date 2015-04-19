@@ -20,6 +20,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
     using Emgu.CV.CvEnum;
     using System.Text;
     using ZeroMQ;
+    using System.Timers;
 
     /// <summary>
     /// Interaction logic for MainWindow
@@ -72,6 +73,15 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
         private double thrust = 0.5;
 
+        private ZContext ZMQcontext = null;
+        private ZSocket ZMQSocket = null;
+
+        private int blobCount = 0;
+        private int blob0_y = 300;
+
+        private Timer PIDTimer;
+        private int PIDTickMS = 50;
+
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
         /// </summary>
@@ -121,6 +131,18 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
             // use the window object as the view model in this simple example
             this.DataContext = this;
+
+            // set up ZMQ stuff
+            ZMQcontext = new ZContext();
+            ZMQSocket = new ZSocket(ZMQcontext, ZSocketType.PUSH);
+            // Connect
+            ZMQSocket.Connect("tcp://127.0.0.1:1212");
+
+            // set up PID stuff
+            PIDTimer = new Timer();
+            PIDTimer.Interval = PIDTickMS; //run at 20Hz;
+            PIDTimer.Elapsed += DoPID;
+            PIDTimer.Start();
 
             // initialize the components (controls) of the window
             this.InitializeComponent();
@@ -186,6 +208,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         /// <param name="e">event arguments</param>
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
+            sendThrust(0);
             if (this.depthFrameReader != null)
             {
                 // DepthFrameReader is IDisposable
@@ -202,23 +225,16 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
         private void sendThrust(double thrust)
         {
-            using (var context = new ZContext())
-            using (var requester = new ZSocket(context, ZSocketType.PUSH))
-            {
-                // Connect
-                requester.Connect("tcp://127.0.0.1:1212");
+            string req = @"{""ctrl"": {
+                    ""version"": 1,
+                    ""roll"": 0.0,
+                    ""pitch"": 0.0,
+                    ""yaw"": 0.0,
+                    ""thrust"": "+thrust+"}}" + "\n";
+            Console.Write("Sending {0}...", req);
 
-                string req = @"{""ctrl"": {
-                        ""version"": 1,
-                        ""roll"": 0.0,
-                        ""pitch"": 0.0,
-                        ""yaw"": 0.0,
-                        ""thrust"": "+thrust+"}}" + "\n";
-                Console.Write("Sending {0}...", req);
-
-                // Send
-                requester.Send(new ZFrame(req));
-            }
+            // Send
+            ZMQSocket.Send(new ZFrame(req));
         }
 
         /// <summary>
@@ -343,7 +359,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
             // note: object creation here is probably a bad idea
             StringBuilder blobInfo = new StringBuilder();
-            int blobCount = 0;
+            blobCount = 0;
 
             using (MemStorage stor = new MemStorage())
             {
@@ -352,8 +368,6 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                 Emgu.CV.CvEnum.CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE,
                 Emgu.CV.CvEnum.RETR_TYPE.CV_RETR_EXTERNAL,
                 stor);
-
-                int blob0_y = 0;
 
                 for (int i = 0; contours != null; contours = contours.HNext)
                 {
@@ -381,33 +395,50 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                         blobCount++;
                     }
                 }
-
-                if (blobCount == 1)
-                {
-                    double err = 200 - blob0_y; //we want to hover at y=300;
-                    thrust = thrust - err*0.001; //adjust thrust accordingly;
-                    if (thrust < 0)
-                    {
-                        thrust = 0;
-                    }
-                    if (thrust > 0.9)
-                    {
-                        thrust = 0.9;
-                    }
-                    sendThrust(thrust);
-                }
-               
-                else
-                {
-                    sendThrust(0.7);
-                    blobInfo.Append("\n NO LOCK ").Append("0.5").Append("\n");
-                }
-                blobInfo.Append("\n THRUST ").Append(thrust).Append("\n");
             }
 
             
             txtBlobCount.Text = blobInfo.ToString();
 
+        }
+
+
+        //everything is a double because lazy
+        double setpoint_y = 200;
+        double error = 0;
+        double lastError = 0;
+        double integral = 0;
+        double derivative;
+        double PV;
+
+        private void DoPID(object sender, System.Timers.ElapsedEventArgs eventArgs)
+        {
+
+            error = setpoint_y - blob0_y; // positive means that the craft is too high. negative means too low.
+
+            integral += error /(double) PIDTickMS; // 
+
+            if (integral > 1000)
+            {
+                integral = 1000;
+            }
+
+            if (integral < -1000)
+            {
+                integral = -1000;
+            }
+
+            derivative = error - lastError / (double) PIDTickMS; // if error > lasterror then this will be positive, indicating that the craft is rising
+
+            lastError = error;
+
+
+            //thrust is a scalefactor times the process variable. 
+            thrust = 0.6 - 0.0005 * error - 0.0003 * integral;// +0.001 * derivative;
+            sendThrust(thrust);
+
+            this.StatusText = String.Format("Y: {0}, P: {1}, I: {2}, D: {3}, PV: {4}, Thrust: {5}", blob0_y, error, integral, derivative, PV, thrust);
+            
         }
         /// <summary>
         /// Renders color pixels into the writeableBitmap.
@@ -435,8 +466,8 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         private void Sensor_IsAvailableChanged(object sender, IsAvailableChangedEventArgs e)
         {
             // on failure, set the status text
-            this.StatusText = this.kinectSensor.IsAvailable ? Properties.Resources.RunningStatusText
-                                                            : Properties.Resources.SensorNotAvailableStatusText;
+            //this.StatusText = this.kinectSensor.IsAvailable ? Properties.Resources.RunningStatusText
+            //                                                : Properties.Resources.SensorNotAvailableStatusText;
         }
     }
 }
