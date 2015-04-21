@@ -66,7 +66,7 @@
 
                     <TextBlock Text="Max Distance" Padding="10"/>
                     <StackPanel Orientation="Horizontal">
-                        <Slider Width="250" Minimum="{Binding Value, ElementName=sliderMin}" Value="1800" Maximum="6000" Margin="5" x:Name="sliderMax" Padding="10"/>
+                        <Slider Width="250" Minimum="{Binding Value, ElementName=sliderMin}" Value="2086" Maximum="6000" Margin="5" x:Name="sliderMax" Padding="10"/>
                         <TextBlock Text="{Binding Value, ElementName=sliderMax}" VerticalAlignment="Center" />
                     </StackPanel>
 

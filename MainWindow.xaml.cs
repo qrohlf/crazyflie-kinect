@@ -208,6 +208,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         /// <param name="e">event arguments</param>
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
+            this.PIDTimer.Stop();
             sendThrust(0);
             if (this.depthFrameReader != null)
             {
@@ -434,7 +435,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
 
             //thrust is a scalefactor times the process variable. 
-            thrust = 0.6 - 0.0005 * error - 0.0003 * integral;// +0.001 * derivative;
+            thrust = 0.6 - 0.0006 * error - 0.0002 * integral;// +0.001 * derivative;
             sendThrust(thrust);
 
             this.StatusText = String.Format("Y: {0}, P: {1}, I: {2}, D: {3}, PV: {4}, Thrust: {5}", blob0_y, error, integral, derivative, PV, thrust);
