@@ -77,7 +77,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         private ZSocket ZMQSocket = null;
 
         private int blobCount = 0;
-        private int blob0_y = 300;
+        private int blob0_y = 424;
 
         private Timer PIDTimer;
         private int PIDTickMS = 50;
@@ -407,7 +407,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         //everything is a double because lazy
         double setpoint_y = 200;
         double error = 0;
-        double lastError = 0;
+        double lastError = 424;
         double integral = 0;
         double derivative;
         double PV;
@@ -419,23 +419,23 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
             integral += error /(double) PIDTickMS; // 
 
-            if (integral > 1000)
+            if (integral > 4000)
             {
-                integral = 1000;
+                integral = 4000;
             }
 
-            if (integral < -1000)
+            if (integral < -4000)
             {
-                integral = -1000;
+                integral = -4000;
             }
 
-            derivative = error - lastError / (double) PIDTickMS; // if error > lasterror then this will be positive, indicating that the craft is rising
+            derivative = (error - lastError) / (double) PIDTickMS; // if error > lasterror then this will be positive, indicating that the craft is rising
 
             lastError = error;
 
 
             //thrust is a scalefactor times the process variable. 
-            thrust = 0.6 - 0.0006 * error - 0.0002 * integral;// +0.001 * derivative;
+            thrust = 0.53 - 0.0006 * error - 0.001 * integral - derivative;
             sendThrust(thrust);
 
             this.StatusText = String.Format("Y: {0}, P: {1}, I: {2}, D: {3}, PV: {4}, Thrust: {5}", blob0_y, error, integral, derivative, PV, thrust);
@@ -449,7 +449,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             this.depthBitmapRaw.WritePixels(
                 new Int32Rect(0, 0, this.depthBitmapRaw.PixelWidth, this.depthBitmapRaw.PixelHeight),
                 this.depthPixels,
-                this.depthBitmapRaw.PixelWidth,
+                this.depthBitmapRaw.PixelWidth,-
                 0);
 
             this.openCVBitmap.WritePixels(
