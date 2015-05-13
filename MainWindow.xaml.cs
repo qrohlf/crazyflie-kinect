@@ -21,6 +21,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
     using System.Text;
     using ZeroMQ;
     using System.Timers;
+    using Newtonsoft.Json;
 
     /// <summary>
     /// Interaction logic for MainWindow
@@ -78,6 +79,8 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
         private int blobCount = 0;
         private int blob0_y = 424;
+        private int blob0_x = 0;
+        private int blob0_z = 1600;
 
         private Timer PIDTimer;
         private int PIDTickMS = 50;
@@ -209,7 +212,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
             this.PIDTimer.Stop();
-            sendThrust(0);
+            sendThrust(0, 0);
             if (this.depthFrameReader != null)
             {
                 // DepthFrameReader is IDisposable
@@ -224,18 +227,24 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             }
         }
 
-        private void sendThrust(double thrust)
+        private void sendThrust(double thrust, double pitch)
         {
-            string req = @"{""ctrl"": {
-                    ""version"": 1,
-                    ""roll"": 0.0,
-                    ""pitch"": 0.0,
-                    ""yaw"": 0.0,
-                    ""thrust"": "+thrust+"}}" + "\n";
-            Console.Write("Sending {0}...", req);
+
+            Object command = new { ctrl = new {
+                version = 1, 
+                roll = 0.0,
+                pitch = pitch,
+                yaw = 0.0,
+                thrust = thrust
+            }
+            };
+
+            String cmdstring = JsonConvert.SerializeObject(command);
+
+            Console.Write("Sending {0}\n", cmdstring);
 
             // Send
-            ZMQSocket.Send(new ZFrame(req));
+            ZMQSocket.Send(new ZFrame(cmdstring+"\n"));
         }
 
         /// <summary>
@@ -380,10 +389,13 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                         MCvMoments p = contours.GetMoments();
                         int x = (int)(p.m10 / p.m00);
                         int y = (int)(p.m01 / p.m00);
+                        int z = frameData[y*depthFrameDescription.Width + x];
                         System.Drawing.PointF center = new System.Drawing.PointF(x, y);
                         CircleF circle = new CircleF(center, 2);
                         depthImage.Draw(box, new Gray(255), 2);
                         depthImage.Draw(circle, new Gray(127), 0);
+                        MCvFont f = new MCvFont(FONT.CV_FONT_HERSHEY_COMPLEX, 1.0, 1.0); //Create the font
+                        depthImage.Draw(z.ToString(), ref f, new System.Drawing.Point(300, 300), new Gray(255)); //Draw "Hello, world." on the image using the specific font
                         blobInfo.Append("Blob ").Append(blobCount).Append(": \n");
                         blobInfo.Append("Area: ").Append((int)contours.Area).Append("\n");
                         blobInfo.Append("Center: ").Append(x).Append(", ").Append(y).Append("\n");
@@ -392,6 +404,8 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                         if (blobCount == 0)
                         {
                             blob0_y = y;
+                            blob0_x = x;
+                            blob0_z = z;
                         }
                         blobCount++;
                     }
@@ -406,39 +420,61 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
         //everything is a double because lazy
         double setpoint_y = 200;
-        double error = 0;
-        double lastError = 424;
-        double integral = 0;
-        double derivative;
-        double PV;
+        double error_y = 0;
+        double lastError_y = 424;
+        double integral_y = 0;
+        double derivative_y;
+
+        double setpoint_z = 1600;
+        double error_z = 0;
+        double lastError_z = 0;
+        double integral_z = 0;
+        double derivative_z = 0;
+        double pitch = 0;
+
 
         private void DoPID(object sender, System.Timers.ElapsedEventArgs eventArgs)
         {
 
-            error = setpoint_y - blob0_y; // positive means that the craft is too high. negative means too low.
+            error_y = setpoint_y - blob0_y; // positive means that the craft is too high. negative means too low.
 
-            integral += error /(double) PIDTickMS; // 
+            integral_y += error_y /(double) PIDTickMS; // 
 
-            if (integral > 4000)
+            if (integral_y > 4000)
             {
-                integral = 4000;
+                integral_y = 4000;
             }
 
-            if (integral < -4000)
+            if (integral_y < -4000)
             {
-                integral = -4000;
+                integral_y = -4000;
             }
 
-            derivative = (error - lastError) / (double) PIDTickMS; // if error > lasterror then this will be positive, indicating that the craft is rising
+            derivative_y = (error_y - lastError_y) / (double) PIDTickMS; // if error > lasterror then this will be positive, indicating that the craft is rising
 
-            lastError = error;
+            lastError_y = error_y;
 
 
             //thrust is a scalefactor times the process variable. 
-            thrust = 0.53 - 0.0006 * error - 0.001 * integral - derivative;
-            sendThrust(thrust);
+            thrust = 0.53 - 0.001 * error_y - 0.002 * integral_y - derivative_y;
 
-            this.StatusText = String.Format("Y: {0}, P: {1}, I: {2}, D: {3}, PV: {4}, Thrust: {5}", blob0_y, error, integral, derivative, PV, thrust);
+
+            //Need to actually put this into a nice PIDController object or something
+            error_z = setpoint_z - blob0_z; //if we are too far forward, blob0_z < setpoint and this will be positive
+
+            integral_z += error_z / (double)PIDTickMS;
+
+            derivative_z = (error_z - lastError_z) / (double)PIDTickMS;
+
+            lastError_z = error_z;
+
+            // if we're too far forward, pitch should be in (0, -15). If too far back, pitch should be in (15, 0)
+            pitch = 0.0002*error_z + 0.0002*integral_z + 0.0001*derivative_z;
+
+            // pitch pos = blue lights towards kinect
+            sendThrust(thrust, 0);
+
+            this.StatusText = String.Format("Z: {0}, P: {1}, I: {2}, D: {3}, Pitch: {4}", blob0_z, error_z, integral_z, derivative_z, pitch);
             
         }
         /// <summary>
