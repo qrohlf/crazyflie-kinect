@@ -55,8 +55,8 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Image Grid.Row="0" Grid.Column="0" Source="{Binding ImageSource}" />
-                <Image Grid.Row="0" Grid.Column="1" Source="{Binding OpenCVBitmapSource}" />
+                <Image x:Name="RawBitmap" Grid.Row="0" Grid.Column="0" Source="{Binding ImageSource}" MouseUp="ImageSetpoint"/>
+                <Image x:Name="OpenCV_Display" Grid.Row="0" Grid.Column="1" Source="{Binding OpenCVBitmapSource}" />
                 <StackPanel Grid.Column="2" Margin="15 0 15 15" Width="300" Background="#f0f0f0" HorizontalAlignment="Right" Grid.Row="0" >
                     <TextBlock Text="Settings"  Padding="10" Background="#ccc" />
                     <TextBlock Text="Min Distance" Padding="10"/>

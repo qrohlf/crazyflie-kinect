@@ -79,8 +79,8 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
         private int blobCount = 0;
         private int blob0_y = 424;
-        private int blob0_x = 0;
-        private int blob0_z = 1600;
+        private int blob0_x = 262;
+        private int blob0_z = 1200;
 
         private Timer PIDTimer;
         private int PIDTickMS = 50;
@@ -212,7 +212,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
             this.PIDTimer.Stop();
-            sendThrust(0, 0);
+            sendThrust(0, 0, 0);
             if (this.depthFrameReader != null)
             {
                 // DepthFrameReader is IDisposable
@@ -227,12 +227,12 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             }
         }
 
-        private void sendThrust(double thrust, double pitch)
+        private void sendThrust(double thrust, double pitch, double roll)
         {
 
             Object command = new { ctrl = new {
                 version = 1, 
-                roll = 0.0,
+                roll = roll,
                 pitch = pitch,
                 yaw = 0.0,
                 thrust = thrust
@@ -241,7 +241,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
             String cmdstring = JsonConvert.SerializeObject(command);
 
-            Console.Write("Sending {0}\n", cmdstring);
+            //Console.Write("Sending {0}\n", cmdstring);
 
             // Send
             ZMQSocket.Send(new ZFrame(cmdstring+"\n"));
@@ -425,13 +425,22 @@ namespace Microsoft.Samples.Kinect.DepthBasics
         double integral_y = 0;
         double derivative_y;
 
-        double setpoint_z = 1600;
+        double setpoint_z = 1200;
         double error_z = 0;
         double lastError_z = 0;
         double integral_z = 0;
         double derivative_z = 0;
         double pitch = 0;
 
+
+        double setpoint_x = 262;
+        double error_x = 0;
+        double lastError_x = 0;
+        double integral_x = 0;
+        double derivative_x = 0;
+        double roll = 0;
+
+        bool loop1 = true;
 
         private void DoPID(object sender, System.Timers.ElapsedEventArgs eventArgs)
         {
@@ -450,7 +459,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                 integral_y = -4000;
             }
 
-            derivative_y = (error_y - lastError_y) / (double) PIDTickMS; // if error > lasterror then this will be positive, indicating that the craft is rising
+            if (!loop1) derivative_y = (error_y - lastError_y) / (double) PIDTickMS; // if error > lasterror then this will be positive, indicating that the craft is rising
 
             lastError_y = error_y;
 
@@ -464,17 +473,29 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
             integral_z += error_z / (double)PIDTickMS;
 
-            derivative_z = (error_z - lastError_z) / (double)PIDTickMS;
+            if (!loop1) derivative_z = (error_z - lastError_z) / (double)PIDTickMS;
 
             lastError_z = error_z;
 
             // if we're too far forward, pitch should be in (0, -15). If too far back, pitch should be in (15, 0)
-            pitch = 0.0002*error_z + 0.0002*integral_z + 0.0001*derivative_z;
+            pitch = 0.001*error_z + 0.0009*integral_z + 0.1*derivative_z;
+
+            // such copypasta. not wow.
+            error_x = setpoint_x - blob0_x;
+
+            integral_x += error_x / (double)PIDTickMS;
+
+            if (!loop1) derivative_x = (error_x - lastError_x) / (double)PIDTickMS;
+
+            lastError_x = error_x;
+
+            roll = 0.006 * error_x + 0.0006 * integral_x + 4 * derivative_x;
 
             // pitch pos = blue lights towards kinect
-            sendThrust(thrust, 0);
+            sendThrust(thrust, pitch, -roll);
 
-            this.StatusText = String.Format("Z: {0}, P: {1}, I: {2}, D: {3}, Pitch: {4}", blob0_z, error_z, integral_z, derivative_z, pitch);
+            this.StatusText = String.Format("Thrust: {0} Roll: {1} Pitch: {2}", thrust, roll, pitch);
+            if (loop1) loop1 = false;
             
         }
         /// <summary>
@@ -505,6 +526,16 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             // on failure, set the status text
             //this.StatusText = this.kinectSensor.IsAvailable ? Properties.Resources.RunningStatusText
             //                                                : Properties.Resources.SensorNotAvailableStatusText;
+        }
+
+        private void ImageSetpoint(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            System.Windows.Controls.Image img = sender as System.Windows.Controls.Image;
+            double x = e.GetPosition(img).X;
+            double y = e.GetPosition(img).Y;
+            Console.Write("Clicked {0}, {1}\n", x, y);
+            setpoint_x = (int)x;
+            setpoint_y = (int)y;
         }
     }
 }
