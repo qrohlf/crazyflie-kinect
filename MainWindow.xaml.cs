@@ -394,8 +394,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
                         CircleF circle = new CircleF(center, 2);
                         depthImage.Draw(box, new Gray(255), 2);
                         depthImage.Draw(circle, new Gray(127), 0);
-                        MCvFont f = new MCvFont(FONT.CV_FONT_HERSHEY_COMPLEX, 1.0, 1.0); //Create the font
-                        depthImage.Draw(z.ToString(), ref f, new System.Drawing.Point(300, 300), new Gray(255)); //Draw "Hello, world." on the image using the specific font
+                        depthImage.Draw(new CircleF(new System.Drawing.Point((int)setpoint_x, (int)setpoint_y), 3), new Gray(127), 0);
                         blobInfo.Append("Blob ").Append(blobCount).Append(": \n");
                         blobInfo.Append("Area: ").Append((int)contours.Area).Append("\n");
                         blobInfo.Append("Center: ").Append(x).Append(", ").Append(y).Append("\n");
@@ -478,7 +477,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             lastError_z = error_z;
 
             // if we're too far forward, pitch should be in (0, -15). If too far back, pitch should be in (15, 0)
-            pitch = 0.001*error_z + 0.0009*integral_z + 0.1*derivative_z;
+            pitch = 0.001*error_z + 0.0009*integral_z + 0.4*derivative_z;
 
             // such copypasta. not wow.
             error_x = setpoint_x - blob0_x;
@@ -489,7 +488,7 @@ namespace Microsoft.Samples.Kinect.DepthBasics
 
             lastError_x = error_x;
 
-            roll = 0.006 * error_x + 0.0006 * integral_x + 4 * derivative_x;
+            roll = 0.003 * error_x + 0.0015 * integral_x + 4.0*derivative_x;
 
             // pitch pos = blue lights towards kinect
             sendThrust(thrust, pitch, -roll);
@@ -536,6 +535,8 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             Console.Write("Clicked {0}, {1}\n", x, y);
             setpoint_x = (int)x;
             setpoint_y = (int)y;
+            //integral_x = 0;
+            //integral_z = 0;
         }
     }
 }
