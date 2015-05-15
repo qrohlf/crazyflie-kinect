@@ -55,12 +55,12 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Image x:Name="RawBitmap" Grid.Row="0" Grid.Column="0" Source="{Binding ImageSource}" MouseUp="ImageSetpoint" RenderTransformOrigin="0.5,0.5">
+                <Image x:Name="RawBitmap" Grid.Row="0" Grid.Column="0" Source="{Binding ImageSource}" MouseUp="ImageSetpoint" RenderTransformOrigin="0.5,0.5" MouseWheel="ImageSetDepth">
                     <Image.RenderTransform>
                         <ScaleTransform ScaleX="-1"/>
                     </Image.RenderTransform>
                 </Image>
-                <Image x:Name="OpenCV_Display" Grid.Row="0" Grid.Column="1" Source="{Binding OpenCVBitmapSource}" MouseUp="ImageSetpoint" RenderTransformOrigin="0.5,0.5">
+                <Image x:Name="OpenCV_Display" Grid.Row="0" Grid.Column="1" Source="{Binding OpenCVBitmapSource}" MouseUp="ImageSetpoint" RenderTransformOrigin="0.5,0.5" MouseWheel="ImageSetDepth">
                     <Image.RenderTransform>
                         <ScaleTransform ScaleX="-1"/>
                     </Image.RenderTransform>

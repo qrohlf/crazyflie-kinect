@@ -537,6 +537,27 @@ namespace Microsoft.Samples.Kinect.DepthBasics
             setpoint_y = (int)y;
             //integral_x = 0;
             //integral_z = 0;
+            int padding = 50;
+            if (setpoint_x < padding) setpoint_x = padding;
+            if (setpoint_x > (512 - padding)) setpoint_x = (512 - padding);
+
+            if (setpoint_y < padding) setpoint_y = padding;
+            if (setpoint_y > (424 - padding)) setpoint_y = (424 - padding);
+        }
+
+        private void ImageSetDepth(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            Console.Write("Scrolled {0}\n", e.Delta);
+            setpoint_z += e.Delta;
+
+            if (setpoint_z > 1600)
+            {
+                setpoint_z = 1600;
+            }
+            else if (setpoint_z < 900)
+            {
+                setpoint_z = 900;
+            }
         }
     }
 }
